@@ -4,3 +4,4 @@ temp/
 *.html
 *.csv
 docs/
+__pycache__/
