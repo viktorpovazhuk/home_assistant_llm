@@ -1,8 +1,11 @@
-literature/
-data/
-temp/
-*.html
-*.csv
-docs/
 __pycache__/
+
+literature/
+temp/
+html/
+docs/
+
+data/prompts/*.md
+temp.csv
+
 tests.ipynb
