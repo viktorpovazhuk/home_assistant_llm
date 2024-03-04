@@ -4,6 +4,7 @@ literature/
 temp/
 html/
 docs/
+datasets/
 
 data/prompts/*.md
 temp.csv
