@@ -4,9 +4,12 @@ literature/
 temp/
 html/
 docs/
+persist_dir/
 datasets/
+models/
 
 data/prompts/*.md
 temp.csv
+output/
 
 tests.ipynb
