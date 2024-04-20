@@ -1,0 +1,1 @@
+For each smart device type from the list generate a list of locations where this type can be located: ["cover", "switch", "light", "input", "temperature", "smoke", "humidity"]. Location is just a room or place. Output must be strictly JSON object: {"Cover": [...], "Switch": [...]}.
