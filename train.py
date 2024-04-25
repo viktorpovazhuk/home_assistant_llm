@@ -31,6 +31,7 @@ class MyTrainingArguments:
     per_device_eval_batch_size: int
     hf_key: str
     wandb_key: str
+    hf_model_name: str
 
 @dataclass
 class DataArguments:
@@ -60,6 +61,8 @@ def main():
     hf_key = training_args.hf_key
     wandb_key = training_args.wandb_key
 
+    hf_model_name = training_args.hf_model_name
+
     os.environ['CUDA_VISIBLE_DEVICES'] = "0"
     os.environ['TOKENIZERS_PARALLELISM'] = "false"
 
@@ -69,9 +72,7 @@ def main():
     train_df = pd.read_csv(data_dir / 'home-assistant/train.csv')
     val_df = pd.read_csv(data_dir / 'home-assistant/val.csv')
 
-    hf_model_name = "mistralai/Mistral-7B-Instruct-v0.2"
-
-    tokenizer = AutoTokenizer.from_pretrained(hf_model_name, 
+    tokenizer = AutoTokenizer.from_pretrained(hf_model_name,
                                             trust_remote_code=True,
                                             token=hf_key)
     tokenizer.pad_token = tokenizer.unk_token
@@ -102,7 +103,7 @@ def main():
         r=16,
         bias="none",
         task_type="CAUSAL_LM",
-        target_modules=["q_proj", "v_proj"]
+        target_modules=["q_proj", "k_proj", "v_proj"]
     )
     model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
     model = get_peft_model(model, peft_config)

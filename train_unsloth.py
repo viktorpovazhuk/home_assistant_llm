@@ -17,6 +17,7 @@ from unsloth import FastLanguageModel
 
 @dataclass
 class MyTrainingArguments:
+    model_name: str
     seq_max_length: int
     per_device_train_batch_size: int
     per_device_eval_batch_size: int
@@ -53,8 +54,6 @@ def main():
 
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-
-    torch.cuda.set_device('cuda:0')
 
     train_df = pd.read_csv(data_dir / 'home-assistant/train.csv')
     val_df = pd.read_csv(data_dir / 'home-assistant/val.csv')
@@ -114,7 +113,6 @@ def main():
         max_grad_norm=0.3,
         max_steps=-1,
         warmup_steps=5,
-        group_by_length=True,
         lr_scheduler_type="cosine",
         # report_to="wandb",
         evaluation_strategy="epoch",
@@ -122,7 +120,6 @@ def main():
         run_name=run_name,
         disable_tqdm=False
     )
-    print(training_arguments.device)
     trainer = SFTTrainer(
         model=model,
         tokenizer=tokenizer,
