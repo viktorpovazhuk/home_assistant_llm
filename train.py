@@ -2,6 +2,8 @@ import os
 import warnings
 from pathlib import Path
 import argparse
+import contextlib
+from dataclasses import dataclass, field
 
 import pandas as pd
 
@@ -19,10 +21,21 @@ from transformers import (AutoModelForCausalLM,
                          TrainingArguments,
                          pipeline,
                          logging,
-                         TrainerCallback)
+                         TrainerCallback,
+                         HfArgumentParser)
 
-os.environ['CUDA_VISIBLE_DEVICES'] = "0"
-os.environ['TOKENIZERS_PARALLELISM'] = "false"
+@dataclass
+class TrainingArguments:
+    seq_max_length: int
+    per_device_train_batch_size: int
+    per_device_eval_batch_size: int
+    hf_key: str
+    wandb_key: str
+
+@dataclass
+class DataArguments:
+    data_path: str
+    output_path: str
 
 def generate_prompt(datapoint, tokenizer):
     inp = tokenizer.apply_chat_template([{'role': 'user', 'content': datapoint['user']}, {'role': 'assistant', 'content': datapoint['assistant']}], tokenize=False)
@@ -34,20 +47,21 @@ class PeftSavingCallback(TrainerCallback):
         kwargs["model"].save_pretrained(checkpoint_path)
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = transformers.HfArgumentParser(
+        (DataArguments, TrainingArguments)
+    )
+    (
+        data_args, training_args
+    ) = parser.parse_args_into_dataclasses()
 
-    parser.add_argument('--data_dir', type=str)
-    parser.add_argument('--output_dir', type=str)
-    parser.add_argument('--hf_key', type=str)
-    parser.add_argument('--wandb_key', type=str)
+    data_dir = Path(data_args.data_path)
+    output_dir = Path(data_args.output_path)
 
-    args = parser.parse_args()
+    hf_key = training_args.hf_key
+    wandb_key = training_args.wandb_key
 
-    data_dir = Path(args.data_dir)
-    output_dir = Path(args.output_dir)
-
-    hf_key = args.hf_key
-    wandb_key = args.wandb_key
+    os.environ['CUDA_VISIBLE_DEVICES'] = "0"
+    os.environ['TOKENIZERS_PARALLELISM'] = "false"
 
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -75,13 +89,13 @@ def main():
         bnb_4bit_quant_type = 'nf4',
         bnb_4bit_compute_dtype = compute_dtype
     )
-
-    model = AutoModelForCausalLM.from_pretrained(
-        hf_model_name,
-        device_map='auto',
-        quantization_config=bnb_config,
-        token=hf_key
-    )
+    with contextlib.redirect_stdout(None):
+        model = AutoModelForCausalLM.from_pretrained(
+            hf_model_name,
+            device_map='auto',
+            quantization_config=bnb_config,
+            token=hf_key
+        )
     peft_config = LoraConfig(
         lora_alpha=16,
         lora_dropout=0.05,
@@ -104,7 +118,8 @@ def main():
     training_arguments = TrainingArguments(
         output_dir=output_dir,
         logging_dir="logs",
-        per_device_train_batch_size=4,
+        per_device_train_batch_size=training_args.per_device_train_batch_size,
+        per_device_eval_batch_size=training_args.per_device_eval_batch_size,
         num_train_epochs=3,
         gradient_accumulation_steps=1,
         optim="paged_adamw_32bit",
@@ -136,7 +151,7 @@ def main():
         args=training_arguments,
         callbacks=callbacks,
         packing=False,
-        max_seq_length=512
+        max_seq_length=training_args.seq_max_length
     )
     model.config.use_cache = False
 
