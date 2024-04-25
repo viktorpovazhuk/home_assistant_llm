@@ -129,10 +129,9 @@ def main():
         learning_rate=2e-4,
         weight_decay=0.001,
         fp16=True,
-        bf16=False,
         max_grad_norm=0.3,
         max_steps=-1,
-        warmup_ratio = 0.05,
+        warmup_ratio=0.05,
         group_by_length=True,
         lr_scheduler_type="cosine",
         report_to="wandb",
@@ -150,7 +149,6 @@ def main():
         tokenizer=tokenizer,
         args=training_arguments,
         callbacks=callbacks,
-        packing=False,
         max_seq_length=training_args.seq_max_length
     )
     model.config.use_cache = False
