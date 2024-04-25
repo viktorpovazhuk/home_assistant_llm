@@ -30,6 +30,7 @@ from pathlib import Path
 import random
 import json
 import shutil
+import sys
 
 GENERATE_METHODS_DIR = Path('data/docs/manual')
 METHODS_DIR = Path('data/docs/methods')
@@ -236,6 +237,9 @@ def predict(llm, df, run_name, num_nodes=3, selected_devices=None, selected_ids=
             header = False
             mode = 'a'
         output_df.iloc[[len(output_df)-1]].to_csv(output_path, index=False, header=header, mode=mode)
+
+        if i % 300 == 0:
+            sys.stdout.flush()
     
     return output_df
 MODELS = {
