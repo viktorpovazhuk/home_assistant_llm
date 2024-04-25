@@ -1,26 +1,16 @@
-import os 
-import warnings
+import os
 from pathlib import Path
-import argparse
-import contextlib
 from dataclasses import dataclass, field
 
 import pandas as pd
 
 import wandb
+
 import torch
-import transformers
-import bitsandbytes
 from datasets import Dataset
-from huggingface_hub import login
-from peft import LoraConfig, PeftConfig, prepare_model_for_kbit_training, get_peft_model
 from trl import SFTTrainer
-from transformers import (AutoModelForCausalLM,
-                         AutoTokenizer,
-                         BitsAndBytesConfig,
+from transformers import (
                          TrainingArguments,
-                         pipeline,
-                         logging,
                          TrainerCallback,
                          HfArgumentParser)
 from unsloth import FastLanguageModel
@@ -48,7 +38,7 @@ class PeftSavingCallback(TrainerCallback):
         kwargs["model"].save_pretrained(checkpoint_path)
 
 def main():
-    parser = transformers.HfArgumentParser(
+    parser = HfArgumentParser(
         (DataArguments, MyTrainingArguments)
     )
     (
@@ -138,7 +128,7 @@ def main():
         train_dataset=train_data,
         eval_dataset=val_data,
         dataset_text_field="text",
-        max_seq_length=training_args.max_seq_length,
+        max_seq_length=training_args.seq_max_length,
         dataset_num_proc=2,
         packing=False,
         args=training_arguments,
