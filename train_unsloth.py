@@ -64,7 +64,8 @@ def main():
         max_seq_length=training_args.seq_max_length,
         dtype=dtype,
         load_in_4bit=True,
-        token=hf_key
+        token=hf_key,
+        device_map='auto',
     )
     tokenizer.pad_token = tokenizer.unk_token
     tokenizer.padding_side = 'right'   
