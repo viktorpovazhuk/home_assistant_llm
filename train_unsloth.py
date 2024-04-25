@@ -53,7 +53,7 @@ def main():
 
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-        
+
     torch.cuda.set_device('cuda:0')
 
     train_df = pd.read_csv(data_dir / 'home-assistant/train.csv')
@@ -122,7 +122,7 @@ def main():
         run_name=run_name,
         disable_tqdm=False
     )
-    print(training_args.device)
+    print(training_arguments.device)
     trainer = SFTTrainer(
         model=model,
         tokenizer=tokenizer,
