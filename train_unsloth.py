@@ -51,9 +51,6 @@ def main():
     hf_key = training_args.hf_key
     wandb_key = training_args.wandb_key
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = "0"
-    os.environ['TOKENIZERS_PARALLELISM'] = "false"
-
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
