@@ -11,3 +11,5 @@ models/
 output/
 keys/
 audio/
+
+nohup.out
