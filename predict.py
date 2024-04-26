@@ -32,6 +32,9 @@ import json
 import shutil
 import sys
 
+from evaluate import evaluate
+import argparse
+
 GENERATE_METHODS_DIR = Path('data/docs/manual')
 METHODS_DIR = Path('data/docs/methods')
 PROMPT_SEEDS_DIR = Path('data/prompts/generation/components')
@@ -43,6 +46,7 @@ PERSIST_DIR = Path("data/persist_dir")
 OUTPUT_DIR = Path("output/")
 MODELS_PATH = Path('models/')
 DATA_DIR = Path('data/')
+
 Settings.embed_model = resolve_embed_model("local:BAAI/bge-base-en-v1.5")
 
 # rebuild storage context
@@ -54,6 +58,7 @@ retriever = VectorIndexRetriever(
     index=index,
     similarity_top_k=3,
 )
+
 def get_base_prompt_variables():
     json_scheme_prompt = {
         "method": {
@@ -142,7 +147,6 @@ JSON:
 
     return user_prompt_template
 
-print(get_base_prompt())
 def predict_prompt(llm, prompt, grammar=None):
     response = llm.create_chat_completion(
         messages=[
@@ -242,10 +246,14 @@ def predict(llm, df, run_name, num_nodes=3, selected_devices=None, selected_ids=
             sys.stdout.flush()
     
     return output_df
+
+# # # # # # # # # # # # 
+
 MODELS = {
     'mistral-7b': 'mistral-7b-instruct-v0.2.Q5_K_M.gguf'
 }
-gt_df = pd.read_csv(DATA_DIR / 'datasets/merged/test_0.csv')
+
+GT_PATH = DATA_DIR / 'datasets/merged/test_0.csv'
 RUN_NAME = 'baseline'
 NUM_EXAMPLES = 2
 NUM_NODES = 3
@@ -258,15 +266,27 @@ settings = {
     'num_examples': NUM_EXAMPLES,
     'n_ctx': N_CTX
 }
+
+# # # # # # # # # # # # 
+
 (OUTPUT_DIR / RUN_NAME).mkdir(exist_ok=True)
+
+gt_df = pd.read_csv(GT_PATH)
 
 with open(OUTPUT_DIR / RUN_NAME / "settings.json", 'w') as f:
     f.write(json.dumps(settings))
 shutil.copy(VAL_PROMPT_COMPONENTS_DIR / 'instruction.md', OUTPUT_DIR / RUN_NAME)
 
-if 'llm' in locals():
-    del llm
-    torch.cuda.empty_cache()
 llm = Llama(str(MODELS_PATH / MODELS[MODEL_NAME]), n_ctx=N_CTX, verbose=False, n_gpu_layers=-1)
 
 output_df = predict(llm, gt_df, RUN_NAME, num_nodes=NUM_NODES, verbose=False)
+
+json_schemes_df = pd.read_csv(METHODS_DIR.parent / 'methods_json.csv')
+
+# output_df = pd.read_csv(OUTPUT_DIR / RUN_NAME / 'output.csv')
+
+with open(OUTPUT_DIR / RUN_NAME / 'settings.json') as f:
+    settings = f.read()
+settings = json.loads(settings)
+
+evaluate(gt_df, output_df, json_schemes_df, RUN_NAME, settings, OUTPUT_DIR, save_intermediate=True)
