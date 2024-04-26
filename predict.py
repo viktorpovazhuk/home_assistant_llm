@@ -73,7 +73,7 @@ def get_base_prompt_variables():
       "method":"Cover.Open",
       "params":
       {
-        "id":2
+        "id":165
       }
     }
 
@@ -81,7 +81,7 @@ def get_base_prompt_variables():
       "method":"Light.Set",
       "params":
       {
-        "id":5,
+        "id":189,
         "on":True,
         "toggle_after":30,
       }
@@ -93,7 +93,7 @@ def get_base_prompt_variables():
     variables = {
     "instruction": instruction,
     "json_scheme": "The output JSON should follow the next scheme: " + json.dumps(json_scheme_prompt),
-    "example_1": """Devices: Entryway Smoke 2 id=15, Attic Cover 1 id=2, Kitchen Temperature 4 id=10
+    "example_1": """Devices: Entryway Smoke 36 id=229, Attic Cover 23 id=165, Kitchen Temperature 55 id=257
 Methods:
 API method 1:
 Method name: Cover.Open
@@ -103,11 +103,11 @@ Properties:
 Response:
 null on success; error if the request can not be executed or failed
 
-Command: Open the Attic Cover 1.
+Command: Open the Attic Cover 23.
 JSON: """ + json.dumps(example_1_json),
 
-    "example_2": """Devices: Garage Cover 5 id=100, Study room Light 4 id=5, Bedroom Switch 1 id=7, Bedroom Smoke 3 id=120, Greenhouse Temperature 3 id=16, Living room Humidity 2 id=38
-Methods: 
+    "example_2": """Devices: Garage Cover 12 id=175, Study room Light 13 id=189, Bedroom Switch 7 id=335, Bedroom Smoke 10 id=187, Greenhouse Temperature 9 id=457, Living room Humidity 9 id=138
+Methods:
 API method 1:
 Method name: Light.Set
 Method description: This method sets the output and brightness level of the Light component. It can be used to trigger webhooks. More information about the events triggering webhooks available for this component can be found below.
@@ -115,7 +115,7 @@ Request
 Parameters:
 {"id": {"type": "number", "description": "Id of the Light component instance. Required"}, "on": {"type": "boolean", "description": "True for light on, false otherwise. Optional"}, "brightness": {"type": "number", "description": "Brightness level Optional"}, "transition_duration": {"type": "number", "description": "Transition time in seconds - time between change from current brightness level to desired brightness level in request Optional"}, "toggle_after": {"type": "number", "description": "Optional flip-back timer in seconds. Optional"}}
 
-Command: Turn on Study room Light 4. And automatically turn it off after half a minute.
+Command: Turn on Study room Light 13. And automatically turn it off after half a minute.
 JSON: """ + json.dumps(example_2_json),
     }
 
