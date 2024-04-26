@@ -249,15 +249,11 @@ def predict(llm, df, run_name, num_nodes=3, selected_devices=None, selected_ids=
 
 # # # # # # # # # # # # 
 
-MODELS = {
-    'mistral-7b': 'mistral-7b-instruct-v0.2.Q5_K_M.gguf'
-}
-
 GT_PATH = DATA_DIR / 'datasets/merged/test_0.csv'
-RUN_NAME = 'baseline'
+RUN_NAME = 'gemma_2b_it_Q4_K_M'
 NUM_EXAMPLES = 2
 NUM_NODES = 3
-MODEL_NAME = 'mistral-7b'
+MODEL_NAME = 'gemma-1.1-2b-it.Q4_K_M.gguf'
 N_CTX = 4000
 settings = {
     'llm': MODEL_NAME,
@@ -277,7 +273,7 @@ with open(OUTPUT_DIR / RUN_NAME / "settings.json", 'w') as f:
     f.write(json.dumps(settings))
 shutil.copy(VAL_PROMPT_COMPONENTS_DIR / 'instruction.md', OUTPUT_DIR / RUN_NAME)
 
-llm = Llama(str(MODELS_PATH / MODELS[MODEL_NAME]), n_ctx=N_CTX, verbose=False, n_gpu_layers=-1)
+llm = Llama(str(MODELS_PATH / MODEL_NAME), n_ctx=N_CTX, verbose=False, n_gpu_layers=-1)
 
 output_df = predict(llm, gt_df, RUN_NAME, num_nodes=NUM_NODES, verbose=False)
 
