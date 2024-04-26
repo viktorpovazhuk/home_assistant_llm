@@ -33,7 +33,7 @@ def check_additional_parameters(gt_json, pred_json, json_scheme):
             return True
         if type(val) == dict:
             try:
-                if check_additional_parameters(val, gt_json[key], json_scheme[key]['properties']):
+                if check_additional_parameters(gt_json[key], val, json_scheme[key]['properties']):
                     return True
             except Exception as e:
                 print(e)
@@ -56,7 +56,7 @@ def check_correctness_parameters(gt_json, pred_json):
         if key not in gt_json:
                 continue
         if type(val) == dict:
-            if check_correctness_parameters(val, gt_json[key]):
+            if check_correctness_parameters(gt_json[key], val):
                 return True
         elif gt_json[key] != val:
             return True
@@ -128,3 +128,9 @@ def evaluate(gt_df, output_df, json_schemes_df, run_name, settings, output_dir, 
     fail_reasons_df = fail_reasons_df.groupby('method', as_index=False).sum()
     fail_reasons_df.insert(0, 'run_name', run_name)
     fail_reasons_df.to_csv(output_dir / 'fail_reasons.csv', index=False, header=not (output_dir / 'fail_reasons.csv').exists(), mode='a')
+
+if __name__ == '__main__':
+    gt = json.loads("""{"method": "Input.ResetCounters", "params": {"id": 53, "type": ["total"]}}""")
+    pred = json.loads("""{"method": "Input.ResetCounters", "params": {"id": 53}}""")
+    scheme = json.loads("""{"method": "Input.ResetCounters", "params": {"type": "object", "properties": {"id": {"type": "number", "description": "Id of the Input component instance. Required"}, "type": {"type": "array of strings", "description": "Array of strings, selects which counter to reset Optional"}}}}""")
+    print(check_additional_parameters(gt, pred, scheme))
