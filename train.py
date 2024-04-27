@@ -14,7 +14,7 @@ import bitsandbytes
 from datasets import Dataset
 from huggingface_hub import login
 from peft import LoraConfig, PeftConfig, prepare_model_for_kbit_training, get_peft_model
-from trl import SFTTrainer
+from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 from transformers import (AutoModelForCausalLM,
                          AutoTokenizer,
                          BitsAndBytesConfig,
@@ -83,6 +83,10 @@ def main():
     train_data = Dataset.from_pandas(train_df)
     val_data = Dataset.from_pandas(val_df)
 
+    response_template_with_context = "<start_of_turn>model"
+    response_template_ids = tokenizer.encode(response_template_with_context, add_special_tokens=False)
+    collator = DataCollatorForCompletionOnlyLM(response_template_ids, tokenizer=tokenizer)
+
     compute_dtype = getattr(torch, "float16")
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
@@ -111,7 +115,7 @@ def main():
     model.print_trainable_parameters()
 
     project = "home-assistant"
-    base_model_name = "mistral-7b-instruct"
+    base_model_name = "gemma-2b-it"
     run_name = base_model_name + "-" + project
     output_dir = str(output_dir / run_name)
 
@@ -126,7 +130,7 @@ def main():
         optim="paged_adamw_32bit",
         save_strategy='steps',
         logging_steps=4,
-        save_steps=50,
+        save_steps=100,
         learning_rate=2e-4,
         weight_decay=0.001,
         fp16=True,
@@ -142,6 +146,7 @@ def main():
         disable_tqdm=False
     )
     trainer = SFTTrainer(
+        data_collator=collator,
         model=model,
         train_dataset=train_data,
         eval_dataset=val_data,
