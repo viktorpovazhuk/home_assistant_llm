@@ -11,5 +11,7 @@ models/
 output/
 keys/
 audio/
+samples/
+assets
 
 nohup.out
