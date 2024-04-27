@@ -140,7 +140,8 @@ def main():
         warmup_ratio=0.05,
         lr_scheduler_type="cosine",
         report_to="wandb",
-        evaluation_strategy="epoch",
+        evaluation_strategy="steps",
+        eval_steps=1500,
         do_eval=True,
         run_name=run_name,
         disable_tqdm=False
