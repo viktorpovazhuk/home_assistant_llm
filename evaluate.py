@@ -16,6 +16,13 @@ import sys
 # necessary properties are absent
 # returns True if check failed
 def check_necessary_parameters(gt_json, pred_json):
+    # not iterable => necessary parameters are absent
+    try:
+        iter(pred_json)
+    except:
+        return True
+    if isinstance(gt_json, str):
+        return True
     for key, val in gt_json.items():
         if key not in pred_json:
             return True
@@ -32,6 +39,7 @@ def check_additional_parameters(gt_json, pred_json, json_scheme):
         if key not in gt_json:
             return True
         if type(val) == dict:
+            # hallucinated => skipped 
             try:
                 if check_additional_parameters(gt_json[key], val, json_scheme[key]['properties']):
                     return True
@@ -46,12 +54,23 @@ def check_hallucinated_parameters(pred_json, json_scheme):
         if key not in json_scheme:
             return True
         if type(val) == dict:
-            if check_hallucinated_parameters(val, json_scheme[key]['properties']):
+            # properties don't exist == sth hallucinated
+            try:
+                if check_hallucinated_parameters(val, json_scheme[key]['properties']):
+                    return True
+            except:
                 return True
     return False
 
 # incorrect value of parameter from prediction
 def check_correctness_parameters(gt_json, pred_json):
+    # not incorrect == hallucinated
+    try:
+        iter(gt_json)
+    except:
+        return False
+    if isinstance(gt_json, str):
+        return False
     for key, val in pred_json.items():
         if key not in gt_json:
                 continue
@@ -80,12 +99,16 @@ def compare_gt_pred(output_df, gt_df, json_schemes_df):
             print(row['json_cmd_gt'])
             print(row['json_cmd_pred'])
             continue
-        method_name = pred_json['method']
-        method_df = json_schemes_df[json_schemes_df['method'] == method_name]
-        if method_df.shape[0] == 0:
+        try:
+            method_name = pred_json['method']
+            method_df = json_schemes_df[json_schemes_df['method'] == method_name]
+            if method_df.shape[0] == 0:
+                json_scheme = None
+            else:
+                json_scheme = json.loads(method_df.iloc[0]['json'])
+        except:
             json_scheme = None
-        else:
-            json_scheme = json.loads(method_df.iloc[0]['json'])
+
         compared_dict = {'id': row['id'], 'device_name': row['device_name'], 'env': row['env'],
             'user_cmd': row['user_cmd'], 'gt_mtd': row['mtd_gt'],
             'pred_mtd': row['mtd_pred'], 'gt_json_cmd': row['json_cmd_gt'], 'pred_json_cmd': row['json_cmd_pred']}
@@ -103,6 +126,7 @@ def compare_gt_pred(output_df, gt_df, json_schemes_df):
 
         compared_df.loc[len(compared_df)] = pd.Series(compared_dict)
     return compared_df
+
 def evaluate(gt_df, output_df, json_schemes_df, run_name, settings, output_dir, save_intermediate=False, verbose=False):
     compared_df = compare_gt_pred(output_df, gt_df, json_schemes_df)
     if save_intermediate:
