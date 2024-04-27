@@ -33,6 +33,9 @@ class MyTrainingArguments:
     wandb_key: str
     hf_model_name: str
     gradient_accumulation_steps: int
+    eval_steps: int
+    save_steps: int
+    logging_steps: int
 
 @dataclass
 class DataArguments:
@@ -130,8 +133,8 @@ def main():
         gradient_accumulation_steps=training_args.gradient_accumulation_steps,
         optim="paged_adamw_32bit",
         save_strategy='steps',
-        logging_steps=4,
-        save_steps=100,
+        logging_steps=training_args.logging_steps,
+        save_steps=training_args.save_steps,
         learning_rate=2e-4,
         weight_decay=0.001,
         fp16=True,
@@ -141,7 +144,7 @@ def main():
         lr_scheduler_type="cosine",
         report_to="wandb",
         evaluation_strategy="steps",
-        eval_steps=1500,
+        eval_steps=training_args.eval_steps,
         do_eval=True,
         run_name=run_name,
         disable_tqdm=False
