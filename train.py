@@ -32,6 +32,7 @@ class MyTrainingArguments:
     hf_key: str
     wandb_key: str
     hf_model_name: str
+    gradient_accumulation_steps: int
 
 @dataclass
 class DataArguments:
@@ -126,7 +127,7 @@ def main():
         per_device_train_batch_size=training_args.per_device_train_batch_size,
         per_device_eval_batch_size=training_args.per_device_eval_batch_size,
         num_train_epochs=3,
-        gradient_accumulation_steps=1,
+        gradient_accumulation_steps=training_args.gradient_accumulation_steps,
         optim="paged_adamw_32bit",
         save_strategy='steps',
         logging_steps=4,
@@ -137,7 +138,6 @@ def main():
         max_grad_norm=0.3,
         max_steps=-1,
         warmup_ratio=0.05,
-        group_by_length=True,
         lr_scheduler_type="cosine",
         report_to="wandb",
         evaluation_strategy="epoch",
