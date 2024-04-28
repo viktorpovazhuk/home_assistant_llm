@@ -24,6 +24,8 @@ from transformers import (AutoModelForCausalLM,
                          TrainerCallback,
                          HfArgumentParser)
 
+from peft import PeftModel
+
 @dataclass
 class MyTrainingArguments:
     seq_max_length: int
@@ -36,6 +38,9 @@ class MyTrainingArguments:
     eval_steps: int
     save_steps: int
     logging_steps: int
+    resume: bool
+    adapter_model: str = field(default=None)
+    run_name: str
 
 @dataclass
 class DataArguments:
@@ -43,7 +48,7 @@ class DataArguments:
     output_path: str
 
 def generate_prompt(datapoint, tokenizer):
-    inp = tokenizer.apply_chat_template([{'role': 'user', 'content': datapoint['user']}, {'role': 'assistant', 'content': datapoint['assistant']}], tokenize=False)
+    inp = tokenizer.apply_chat_template([{'role': 'user', 'content': datapoint['user']}, {'role': 'assistant', 'content': datapoint['assistant']}], tokenize=False) + '<eos>'
     return inp
 
 class PeftSavingCallback(TrainerCallback):
@@ -91,12 +96,11 @@ def main():
     response_template_ids = tokenizer.encode(response_template_with_context, add_special_tokens=False)
     collator = DataCollatorForCompletionOnlyLM(response_template_ids, tokenizer=tokenizer)
 
-    compute_dtype = getattr(torch, "float16")
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_use_double_quant=True,
         bnb_4bit_quant_type='nf4',
-        bnb_4bit_compute_dtype=compute_dtype
+        bnb_4bit_compute_dtype=torch.float16
     )
     with contextlib.redirect_stdout(None):
         model = AutoModelForCausalLM.from_pretrained(
@@ -105,22 +109,25 @@ def main():
             quantization_config=bnb_config,
             token=hf_key
         )
-    peft_config = LoraConfig(
-        lora_alpha=16,
-        lora_dropout=0.05,
-        r=16,
-        bias="none",
-        task_type="CAUSAL_LM",
-        target_modules=["q_proj", "k_proj", "v_proj"]
-    )
-    model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
-    model = get_peft_model(model, peft_config)
+
+    if not training_args.resume:
+        peft_config = LoraConfig(
+            lora_alpha=16,
+            lora_dropout=0.05,
+            r=16,
+            bias="none",
+            task_type="CAUSAL_LM",
+            target_modules=["q_proj", "k_proj", "v_proj"]
+        )
+        model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
+        model = get_peft_model(model, peft_config)
+    else:
+        peft_config = PeftConfig.from_pretrained(training_args.adapter_model)
+        model = PeftModel.from_pretrained(model, training_args.adapter_model)
 
     model.print_trainable_parameters()
 
-    project = "home-assistant"
-    base_model_name = "gemma-2b-it"
-    run_name = base_model_name + "-" + project
+    run_name = training_args.run_name
     output_dir = str(output_dir / run_name)
 
     callbacks = [PeftSavingCallback]
