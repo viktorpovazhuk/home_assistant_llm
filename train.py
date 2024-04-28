@@ -39,8 +39,8 @@ class MyTrainingArguments:
     save_steps: int
     logging_steps: int
     resume: bool
-    adapter_model: str = field(default=None)
     run_name: str
+    adapter_model: str = field(default=None)
 
 @dataclass
 class DataArguments:
