@@ -175,7 +175,10 @@ def main():
 
     wandb.login(key=wandb_key)
 
-    trainer.train()
+    if training_args.resume:
+        trainer.train(resume_from_checkpoint=training_args.adapter_model)
+    else:
+        trainer.train()
 
     wandb.finish()
 
