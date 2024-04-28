@@ -38,8 +38,8 @@ class MyTrainingArguments:
     eval_steps: int
     save_steps: int
     logging_steps: int
-    resume: bool
     run_name: str
+    resume: bool = field(default=False)
     adapter_model: str = field(default=None)
 
 @dataclass
@@ -123,7 +123,7 @@ def main():
         model = get_peft_model(model, peft_config)
     else:
         peft_config = PeftConfig.from_pretrained(training_args.adapter_model)
-        model = PeftModel.from_pretrained(model, training_args.adapter_model)
+        model = PeftModel.from_pretrained(model, training_args.adapter_model, is_trainable=True)
 
     model.print_trainable_parameters()
 
