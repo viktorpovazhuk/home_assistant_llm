@@ -168,6 +168,8 @@ def predict(df, run_name, num_nodes=3, selected_devices=None, selected_ids=None,
 
         retrieval_prompt = "Represent this sentence for searching relevant passages: " + user_cmd
         retrieved_nodes = retriever.retrieve(retrieval_prompt)
+
+        torch.cuda.empty_cache()
         
         completed = False
         while (not completed) and (num_nodes > 0):
@@ -185,12 +187,14 @@ def predict(df, run_name, num_nodes=3, selected_devices=None, selected_ids=None,
             except Exception as e:
                 print(e)
 
+                torch.cuda.empty_cache()
+
                 num_nodes -= 1
-        
+
         if verbose:
             print(f'{prompt}\n')
             print('<<<------------------------------------------>>>\n\n')
-        
+
         if json_cmd == "":
             continue
 
@@ -213,7 +217,7 @@ def predict(df, run_name, num_nodes=3, selected_devices=None, selected_ids=None,
 # # # # # # # # # # # # 
 
 GT_PATH = DATA_DIR / 'datasets/merged/test_0.csv'
-RUN_NAME = 'gemma_2b_it_hf_ft'
+RUN_NAME = 'mistral_7b_instruct_v0.2.Q5_K_M'
 NUM_EXAMPLES = 0
 NUM_NODES = 3
 MODEL_NAME = 'google/gemma-1.1-2b-it'
