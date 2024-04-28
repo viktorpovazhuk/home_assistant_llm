@@ -119,7 +119,7 @@ def compare_gt_pred(output_df, gt_df, json_schemes_df):
         compared_dict['incor'] = check_correctness_parameters(gt_json, pred_json)
         if json_scheme:
             compared_dict['add'] = check_additional_parameters(gt_json, pred_json, json_scheme)
-            compared_dict['hall'] = check_hallucinated_parameters(gt_json, json_scheme)
+            compared_dict['hall'] = check_hallucinated_parameters(pred_json, json_scheme)
         else:
             compared_dict['add'] = False
             compared_dict['hall'] = False
@@ -154,7 +154,11 @@ def evaluate(gt_df, output_df, json_schemes_df, run_name, settings, output_dir, 
     fail_reasons_df.to_csv(output_dir / 'fail_reasons.csv', index=False, header=not (output_dir / 'fail_reasons.csv').exists(), mode='a')
 
 if __name__ == '__main__':
-    gt = json.loads("""{"method": "Input.ResetCounters", "params": {"id": 53, "type": ["total"]}}""")
-    pred = json.loads("""{"method": "Input.ResetCounters", "params": {"id": 53}}""")
-    scheme = json.loads("""{"method": "Input.ResetCounters", "params": {"type": "object", "properties": {"id": {"type": "number", "description": "Id of the Input component instance. Required"}, "type": {"type": "array of strings", "description": "Array of strings, selects which counter to reset Optional"}}}}""")
-    print(check_additional_parameters(gt, pred, scheme))
+    # gt = json.loads("""{"method": "Input.ResetCounters", "params": {"id": 53, "type": ["total"]}}""")
+    # pred = json.loads("""{"method": "Input.ResetCounters", "params": {"id": 53}}""")
+    # scheme = json.loads("""{"method": "Input.ResetCounters", "params": {"type": "object", "properties": {"id": {"type": "number", "description": "Id of the Input component instance. Required"}, "type": {"type": "array of strings", "description": "Array of strings, selects which counter to reset Optional"}}}}""")
+    # print(check_additional_parameters(gt, pred, scheme))
+
+    pred = json.loads("""{"method": "Smoke.Mute", "params": {"id": 5, "mute": true}}""")
+    scheme = json.loads("""{"method": "Smoke.Mute", "params": {"type": "object", "properties": {"id": {"type": "number", "description": "Id of the Smoke component instance"}}}}""")
+    print(check_hallucinated_parameters(pred, scheme))
