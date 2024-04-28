@@ -23,8 +23,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
 
-from llama_cpp import Llama
-from llama_cpp import LlamaGrammar
+from transformers import BitsAndBytesConfig, AutoModelForCausalLM, AutoTokenizer
 
 from pathlib import Path
 import random
@@ -34,6 +33,14 @@ import sys
 
 from evaluate import evaluate
 import argparse
+
+from peft import (
+    LoraConfig,
+    PeftConfig,
+    PeftModel,
+    get_peft_model,
+    prepare_model_for_kbit_training,
+)
 
 GENERATE_METHODS_DIR = Path('data/docs/manual')
 METHODS_DIR = Path('data/docs/methods')
@@ -69,54 +76,12 @@ def get_base_prompt_variables():
         }
     }
 
-    example_1_json = {
-      "method":"Cover.Open",
-      "params":
-      {
-        "id":165
-      }
-    }
-
-    example_2_json = {
-      "method":"Light.Set",
-      "params":
-      {
-        "id":189,
-        "on":True,
-        "toggle_after":30,
-      }
-    }
-
     with open(VAL_PROMPT_COMPONENTS_DIR / 'instruction.md') as f:
       instruction = f.read()
 
     variables = {
     "instruction": instruction,
     "json_scheme": "The output JSON should follow the next scheme: " + json.dumps(json_scheme_prompt),
-    "example_1": """Devices: Entryway Smoke 36 id=229, Attic Cover 23 id=165, Kitchen Temperature 55 id=257
-Methods:
-API method 1:
-Method name: Cover.Open
-Method description: 
-Properties:
-{"id": {"type": "number", "description": "The numeric ID of the Cover component instance"}, "duration": {"type": "number", "description": "If duration is not provided, Cover will fully open, unless it times out because of maxtime_open first. If duration (seconds) is provided, Cover will move in the open direction for the specified time. duration must be in the range [0.1..maxtime_open]Optional"}}
-Response:
-null on success; error if the request can not be executed or failed
-
-Command: Open the Attic Cover 23.
-JSON: """ + json.dumps(example_1_json),
-
-    "example_2": """Devices: Garage Cover 12 id=175, Study room Light 13 id=189, Bedroom Switch 7 id=335, Bedroom Smoke 10 id=187, Greenhouse Temperature 9 id=457, Living room Humidity 9 id=138
-Methods:
-API method 1:
-Method name: Light.Set
-Method description: This method sets the output and brightness level of the Light component. It can be used to trigger webhooks. More information about the events triggering webhooks available for this component can be found below.
-Request
-Parameters:
-{"id": {"type": "number", "description": "Id of the Light component instance. Required"}, "on": {"type": "boolean", "description": "True for light on, false otherwise. Optional"}, "brightness": {"type": "number", "description": "Brightness level Optional"}, "transition_duration": {"type": "number", "description": "Transition time in seconds - time between change from current brightness level to desired brightness level in request Optional"}, "toggle_after": {"type": "number", "description": "Optional flip-back timer in seconds. Optional"}}
-
-Command: Turn on Study room Light 13. And automatically turn it off after half a minute.
-JSON: """ + json.dumps(example_2_json),
     }
 
     return variables
@@ -124,8 +89,6 @@ def get_base_prompt():
     base_prompt_template = """
 {instruction}
 {json_scheme}
-
-{example_1}
     """
 
     variables = get_base_prompt_variables()
@@ -133,10 +96,6 @@ def get_base_prompt():
     base_prompt = base_prompt_template.format(**variables)
 
     return base_prompt
-
-# {example_1}
-
-# {example_2}
 
 def get_user_prompt_template():
     user_prompt_template = """Devices: {env}
@@ -149,16 +108,19 @@ JSON:
 
     return user_prompt_template
 
-def predict_prompt(llm, prompt, grammar=None):
-    response = llm.create_chat_completion(
-        messages=[
-            {'role': 'user', 'content': prompt}
-        ],
-        grammar=grammar
-    )
+def predict_prompt(prompt):
+    chat = [
+        {"role": "user", "content": prompt},
+    ]
+    prompt = tokenizer.apply_chat_template(chat, add_generation_prompt=True, return_tensors='pt').to("cuda")
+    prompt_tokens_len = len(prompt[0])
+    response = llm.generate(input_ids=prompt, max_new_tokens=4000-prompt_tokens_len)
 
-    response_text = response['choices'][0]['message']['content']
-    response_text = response_text.replace('\_', '_')
+    response_text = tokenizer.decode(response[0][prompt_tokens_len:], skip_special_tokens=True)
+    response_text = response_text.strip('\n')
+
+    del response
+    torch.cuda.empty_cache()
 
     try:
         json_cmd = json.dumps(json.loads(response_text))
@@ -182,12 +144,8 @@ def get_methods_description(retrieved_nodes):
 
     return methods_names, methods_description
 
-def predict(llm, df, run_name, num_nodes=3, selected_devices=None, selected_ids=None, limit_rows=None, verbose=False):
+def predict(df, run_name, num_nodes=3, selected_devices=None, selected_ids=None, limit_rows=None, verbose=False):
     output_path = OUTPUT_DIR / run_name / 'output.csv'
-
-    with open('data/grammars/json.gbnf') as f:
-        grammar_str = f.read()
-    llama_grammar = LlamaGrammar.from_string(grammar_str, verbose=False)
 
     if selected_devices:
         df = df[df['device'].isin(selected_devices)].sort_index()
@@ -202,8 +160,8 @@ def predict(llm, df, run_name, num_nodes=3, selected_devices=None, selected_ids=
     for i, row in df.iterrows():
         print(i)
 
-        num_nodes = 3
-
+        num_nodes=3
+        
         user_cmd = row['user_cmd']
 
         env = row['env']
@@ -221,7 +179,7 @@ def predict(llm, df, run_name, num_nodes=3, selected_devices=None, selected_ids=
                                                             'user_cmd': user_cmd})
                 prompt = get_base_prompt() + '\n\n' + user_prompt
 
-                json_cmd = predict_prompt(llm, prompt, llama_grammar)
+                json_cmd = predict_prompt(prompt)
 
                 completed = True
             except Exception as e:
@@ -255,16 +213,18 @@ def predict(llm, df, run_name, num_nodes=3, selected_devices=None, selected_ids=
 # # # # # # # # # # # # 
 
 GT_PATH = DATA_DIR / 'datasets/merged/test_0.csv'
-RUN_NAME = 'mistral_7b_instruct_v0.2.Q5_K_M_1_example'
-NUM_EXAMPLES = 1
+RUN_NAME = 'gemma_2b_it_hf_ft'
+NUM_EXAMPLES = 0
 NUM_NODES = 3
-MODEL_NAME = 'mistral-7b-instruct-v0.2.Q5_K_M.gguf'
+MODEL_NAME = 'google/gemma-1.1-2b-it'
+PEFT_MODEL = "models/gemma/checkpoint-50"
 N_CTX = 4000
 settings = {
     'llm': MODEL_NAME,
     'num_examples': NUM_EXAMPLES,
     'num_nodes': NUM_NODES,
-    'n_ctx': N_CTX
+    'n_ctx': N_CTX,
+    'peft_model': PEFT_MODEL
 }
 
 # # # # # # # # # # # # 
@@ -277,9 +237,25 @@ with open(OUTPUT_DIR / RUN_NAME / "settings.json", 'w') as f:
     f.write(json.dumps(settings))
 shutil.copy(VAL_PROMPT_COMPONENTS_DIR / 'instruction.md', OUTPUT_DIR / RUN_NAME)
 
-llm = Llama(str(MODELS_PATH / MODEL_NAME), n_ctx=N_CTX, verbose=False, n_gpu_layers=-1)
+peft_config = PeftConfig.from_pretrained(PEFT_MODEL)
 
-output_df = predict(llm, gt_df, RUN_NAME, num_nodes=NUM_NODES, verbose=False)
+nf4_config = BitsAndBytesConfig(
+   load_in_4bit=True,
+   bnb_4bit_quant_type="nf4",
+   bnb_4bit_use_double_quant=True,
+   bnb_4bit_compute_dtype=torch.float16
+)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+llm = AutoModelForCausalLM.from_pretrained(
+    MODEL_NAME,
+    device_map="cuda",
+    torch_dtype=torch.float16,
+    quantization_config=nf4_config
+)
+
+llm = PeftModel.from_pretrained(llm, PEFT_MODEL)
+
+output_df = predict( gt_df, RUN_NAME, num_nodes=NUM_NODES, verbose=False)
 
 json_schemes_df = pd.read_csv(METHODS_DIR.parent / 'methods_json.csv')
 

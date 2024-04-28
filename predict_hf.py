@@ -23,8 +23,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
 
-from llama_cpp import Llama
-from llama_cpp import LlamaGrammar
+from transformers import BitsAndBytesConfig, AutoModelForCausalLM, AutoTokenizer
 
 from pathlib import Path
 import random
@@ -149,22 +148,28 @@ JSON:
 
     return user_prompt_template
 
-def predict_prompt(llm, prompt, grammar=None):
-    response = llm.create_chat_completion(
-        messages=[
-            {'role': 'user', 'content': prompt}
-        ],
-        grammar=grammar
-    )
+def predict_prompt(prompt):
+    chat = [
+        {"role": "user", "content": prompt},
+    ]
+    prompt = tokenizer.apply_chat_template(chat, add_generation_prompt=True, return_tensors='pt').to("cuda")
+    prompt_tokens_len = len(prompt[0])
+    response = llm.generate(input_ids=prompt, max_new_tokens=4000-prompt_tokens_len)
 
-    response_text = response['choices'][0]['message']['content']
-    response_text = response_text.replace('\_', '_')
+    response = tokenizer.decode(response[0][prompt_tokens_len:], skip_special_tokens=True)
+    if '```json' in response:
+        start_i = response.find('```json') + 7
+        response = response[start_i:]
+    if '```' in response:
+        stop_i = response.find('```')
+        response = response[:stop_i]
+    response = response.strip('\n')
 
     try:
-        json_cmd = json.dumps(json.loads(response_text))
+        json_cmd = json.dumps(json.loads(response))
     except Exception as e:
         print(e)
-        print(response_text)
+        print(response)
         return ""
 
     return json_cmd
@@ -182,12 +187,8 @@ def get_methods_description(retrieved_nodes):
 
     return methods_names, methods_description
 
-def predict(llm, df, run_name, num_nodes=3, selected_devices=None, selected_ids=None, limit_rows=None, verbose=False):
+def predict(df, run_name, num_nodes=3, selected_devices=None, selected_ids=None, limit_rows=None, verbose=False):
     output_path = OUTPUT_DIR / run_name / 'output.csv'
-
-    with open('data/grammars/json.gbnf') as f:
-        grammar_str = f.read()
-    llama_grammar = LlamaGrammar.from_string(grammar_str, verbose=False)
 
     if selected_devices:
         df = df[df['device'].isin(selected_devices)].sort_index()
@@ -203,7 +204,7 @@ def predict(llm, df, run_name, num_nodes=3, selected_devices=None, selected_ids=
         print(i)
 
         num_nodes = 3
-
+        
         user_cmd = row['user_cmd']
 
         env = row['env']
@@ -221,7 +222,7 @@ def predict(llm, df, run_name, num_nodes=3, selected_devices=None, selected_ids=
                                                             'user_cmd': user_cmd})
                 prompt = get_base_prompt() + '\n\n' + user_prompt
 
-                json_cmd = predict_prompt(llm, prompt, llama_grammar)
+                json_cmd = predict_prompt(prompt)
 
                 completed = True
             except Exception as e:
@@ -255,10 +256,10 @@ def predict(llm, df, run_name, num_nodes=3, selected_devices=None, selected_ids=
 # # # # # # # # # # # # 
 
 GT_PATH = DATA_DIR / 'datasets/merged/test_0.csv'
-RUN_NAME = 'mistral_7b_instruct_v0.2.Q5_K_M_1_example'
-NUM_EXAMPLES = 1
+RUN_NAME = 'gemma_2b_it_hf'
+NUM_EXAMPLES = 2
 NUM_NODES = 3
-MODEL_NAME = 'mistral-7b-instruct-v0.2.Q5_K_M.gguf'
+MODEL_NAME = 'google/gemma-1.1-2b-it'
 N_CTX = 4000
 settings = {
     'llm': MODEL_NAME,
@@ -277,9 +278,22 @@ with open(OUTPUT_DIR / RUN_NAME / "settings.json", 'w') as f:
     f.write(json.dumps(settings))
 shutil.copy(VAL_PROMPT_COMPONENTS_DIR / 'instruction.md', OUTPUT_DIR / RUN_NAME)
 
-llm = Llama(str(MODELS_PATH / MODEL_NAME), n_ctx=N_CTX, verbose=False, n_gpu_layers=-1)
+nf4_config = BitsAndBytesConfig(
+   load_in_4bit=True,
+   bnb_4bit_quant_type="nf4",
+   bnb_4bit_use_double_quant=True,
+   bnb_4bit_compute_dtype=torch.float16
+)
 
-output_df = predict(llm, gt_df, RUN_NAME, num_nodes=NUM_NODES, verbose=False)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+llm = AutoModelForCausalLM.from_pretrained(
+    MODEL_NAME,
+    device_map="cuda",
+    torch_dtype=torch.float16,
+    quantization_config=nf4_config
+)
+
+output_df = predict( gt_df, RUN_NAME, num_nodes=NUM_NODES, verbose=False)
 
 json_schemes_df = pd.read_csv(METHODS_DIR.parent / 'methods_json.csv')
 
