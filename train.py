@@ -110,7 +110,7 @@ def main():
             token=hf_key
         )
 
-    if not training_args.resume:
+    if training_args.adapter_model is None:
         peft_config = LoraConfig(
             lora_alpha=16,
             lora_dropout=0.05,
