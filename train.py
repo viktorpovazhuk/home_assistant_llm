@@ -78,8 +78,8 @@ def main():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    train_df = pd.read_csv(data_dir / 'home-assistant/train.csv')
-    val_df = pd.read_csv(data_dir / 'home-assistant/val.csv')
+    train_df = pd.read_csv(data_dir / 'train.csv')
+    val_df = pd.read_csv(data_dir / 'val.csv')
 
     tokenizer = AutoTokenizer.from_pretrained(hf_model_name,
                                             trust_remote_code=True,
