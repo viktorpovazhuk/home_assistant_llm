@@ -214,59 +214,68 @@ def predict(df, run_name, num_nodes=3, selected_devices=None, selected_ids=None,
     
     return output_df
 
-# # # # # # # # # # # # 
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
 
-GT_PATH = DATA_DIR / 'datasets/merged/test_0.csv'
-RUN_NAME = 'mistral_7b_instruct_v0.2.Q5_K_M'
-NUM_EXAMPLES = 0
-NUM_NODES = 3
-MODEL_NAME = 'google/gemma-1.1-2b-it'
-PEFT_MODEL = "models/gemma/checkpoint-50"
-N_CTX = 4000
-settings = {
-    'llm': MODEL_NAME,
-    'num_examples': NUM_EXAMPLES,
-    'num_nodes': NUM_NODES,
-    'n_ctx': N_CTX,
-    'peft_model': PEFT_MODEL
-}
+    parser.add_argument('--run_name', type=str)
+    parser.add_argument('--model_name', type=str)
+    parser.add_argument('--peft_model', type=str)
 
-# # # # # # # # # # # # 
+    args = parser.parse_args()
 
-(OUTPUT_DIR / RUN_NAME).mkdir(exist_ok=True)
+    # # # # # # # # # # # # 
 
-gt_df = pd.read_csv(GT_PATH)
+    GT_PATH = DATA_DIR / 'datasets/merged/test_0.csv'
+    RUN_NAME = args.run_name
+    NUM_EXAMPLES = 0
+    NUM_NODES = 3
+    MODEL_NAME = args.model_name
+    PEFT_MODEL = args.peft_model
+    N_CTX = 4000
+    settings = {
+        'llm': MODEL_NAME,
+        'num_examples': NUM_EXAMPLES,
+        'num_nodes': NUM_NODES,
+        'n_ctx': N_CTX,
+        'peft_model': PEFT_MODEL
+    }
 
-with open(OUTPUT_DIR / RUN_NAME / "settings.json", 'w') as f:
-    f.write(json.dumps(settings))
-shutil.copy(VAL_PROMPT_COMPONENTS_DIR / 'instruction.md', OUTPUT_DIR / RUN_NAME)
+    # # # # # # # # # # # # 
 
-peft_config = PeftConfig.from_pretrained(PEFT_MODEL)
+    (OUTPUT_DIR / RUN_NAME).mkdir(exist_ok=True)
 
-nf4_config = BitsAndBytesConfig(
-   load_in_4bit=True,
-   bnb_4bit_quant_type="nf4",
-   bnb_4bit_use_double_quant=True,
-   bnb_4bit_compute_dtype=torch.float16
-)
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-llm = AutoModelForCausalLM.from_pretrained(
-    MODEL_NAME,
-    device_map="cuda",
-    torch_dtype=torch.float16,
-    quantization_config=nf4_config
-)
+    gt_df = pd.read_csv(GT_PATH)
 
-llm = PeftModel.from_pretrained(llm, PEFT_MODEL)
+    with open(OUTPUT_DIR / RUN_NAME / "settings.json", 'w') as f:
+        f.write(json.dumps(settings))
+    shutil.copy(VAL_PROMPT_COMPONENTS_DIR / 'instruction.md', OUTPUT_DIR / RUN_NAME)
 
-output_df = predict( gt_df, RUN_NAME, num_nodes=NUM_NODES, verbose=False)
+    peft_config = PeftConfig.from_pretrained(PEFT_MODEL)
 
-json_schemes_df = pd.read_csv(METHODS_DIR.parent / 'methods_json.csv')
+    nf4_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_compute_dtype=torch.float16
+    )
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    llm = AutoModelForCausalLM.from_pretrained(
+        MODEL_NAME,
+        device_map="cuda",
+        torch_dtype=torch.float16,
+        quantization_config=nf4_config
+    )
 
-output_df = pd.read_csv(OUTPUT_DIR / RUN_NAME / 'output.csv')
+    llm = PeftModel.from_pretrained(llm, PEFT_MODEL)
 
-with open(OUTPUT_DIR / RUN_NAME / 'settings.json') as f:
-    settings = f.read()
-settings = json.loads(settings)
+    output_df = predict( gt_df, RUN_NAME, num_nodes=NUM_NODES, verbose=False)
 
-evaluate(gt_df, output_df, json_schemes_df, RUN_NAME, settings, OUTPUT_DIR, save_intermediate=True)
+    json_schemes_df = pd.read_csv(METHODS_DIR.parent / 'methods_json.csv')
+
+    output_df = pd.read_csv(OUTPUT_DIR / RUN_NAME / 'output.csv')
+
+    with open(OUTPUT_DIR / RUN_NAME / 'settings.json') as f:
+        settings = f.read()
+    settings = json.loads(settings)
+
+    evaluate(gt_df, output_df, json_schemes_df, RUN_NAME, settings, OUTPUT_DIR, save_intermediate=True)
