@@ -92,9 +92,9 @@ def main():
     train_data = Dataset.from_pandas(train_df)
     val_data = Dataset.from_pandas(val_df)
 
-    response_template_with_context = "[/INST]"
-    response_template_ids = tokenizer.encode(response_template_with_context, add_special_tokens=False)
-    collator = DataCollatorForCompletionOnlyLM(response_template_ids, tokenizer=tokenizer)
+    # response_template_with_context = "[/INST]"
+    # response_template_ids = tokenizer.encode(response_template_with_context, add_special_tokens=False)
+    collator = DataCollatorForCompletionOnlyLM([733, 28748, 16289], tokenizer=tokenizer)
 
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
