@@ -48,7 +48,7 @@ class DataArguments:
     output_path: str
 
 def generate_prompt(datapoint, tokenizer):
-    inp = tokenizer.apply_chat_template([{'role': 'user', 'content': datapoint['user']}, {'role': 'assistant', 'content': datapoint['assistant']}], tokenize=False) + '<eos>'
+    inp = tokenizer.apply_chat_template([{'role': 'user', 'content': datapoint['user']}, {'role': 'assistant', 'content': datapoint['assistant']}], tokenize=False)
     return inp
 
 class PeftSavingCallback(TrainerCallback):
@@ -92,9 +92,9 @@ def main():
     train_data = Dataset.from_pandas(train_df)
     val_data = Dataset.from_pandas(val_df)
 
-    response_template_with_context = "<start_of_turn>model"
-    response_template_ids = tokenizer.encode(response_template_with_context, add_special_tokens=False)
-    collator = DataCollatorForCompletionOnlyLM(response_template_ids, tokenizer=tokenizer)
+    # response_template_with_context = "[/INST]"
+    # response_template_ids = tokenizer.encode(response_template_with_context, add_special_tokens=False)
+    collator = DataCollatorForCompletionOnlyLM([733, 28748, 16289], tokenizer=tokenizer)
 
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
